@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bucks Schedule Calendar</title>
+<meta name="description" content="Subscribe to the Milwaukee Bucks schedule in your calendar. Updates automatically.">
+<style>
+  :root {
+    --bg: #f6f1e4;
+    --card: #ffffff;
+    --ink: #17231b;
+    --muted: #5a6a5f;
+    --green: #00471b;
+    --green-ink: #ffffff;
+    --line: #d9d2bd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1a13;
+      --card: #16241b;
+      --ink: #eef2ea;
+      --muted: #a3b2a8;
+      --green: #2f9e57;
+      --green-ink: #06140b;
+      --line: #28392d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 40px 16px 56px; }
+  h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 8px; }
+  .lead { color: var(--muted); margin: 0 0 24px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px;
+  }
+  .buttons { display: grid; gap: 10px; }
+  a.btn, button.btn {
+    display: block;
+    width: 100%;
+    padding: 14px 16px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--green);
+    color: var(--green-ink);
+    font: inherit;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  a.btn:hover, button.btn:hover { filter: brightness(1.1); }
+  a.btn:focus-visible, button.btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  button.btn.secondary {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  .url {
+    margin: 16px 0 0;
+    padding: 10px 12px;
+    border: 1px dashed var(--line);
+    border-radius: 8px;
+    font: 0.8rem/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+  h2 { font-size: 1rem; margin: 28px 0 8px; }
+  ul { margin: 0; padding-left: 1.2em; color: var(--muted); }
+  li { margin-bottom: 6px; }
+  .fine { margin-top: 32px; font-size: 0.8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Milwaukee Bucks schedule</h1>
+  <p class="lead">Subscribe once and every game shows up in your calendar, including the play-in and playoffs when they happen. It updates on its own.</p>
+
+  <div class="card">
+    <div class="buttons">
+      <a class="btn" id="apple" href="#">Apple Calendar (iPhone, iPad, Mac)</a>
+      <a class="btn" id="google" href="#" target="_blank" rel="noopener">Google Calendar</a>
+      <a class="btn" id="outlook" href="#" target="_blank" rel="noopener">Outlook</a>
+      <button class="btn secondary" id="copy" type="button">Copy calendar link</button>
+    </div>
+    <p class="url" id="url"></p>
+  </div>
+
+  <h2>What you'll see</h2>
+  <ul>
+    <li>Events named like <strong>Celtics @ Bucks</strong>, in Central Time (your calendar converts to your own time zone).</li>
+    <li>Where to watch in each event's description.</li>
+    <li>Games with no start time yet appear as all-day events and move to the right time once it's set.</li>
+  </ul>
+
+  <h2>Other calendar apps</h2>
+  <ul>
+    <li>Use <strong>Copy calendar link</strong>, then look for "Add calendar from URL" or "Subscribe to calendar" in your app.</li>
+    <li>Your calendar app decides how often to refresh. Google can take up to a day to show changes.</li>
+  </ul>
+
+  <p class="fine">Unofficial, fan-made calendar. Not affiliated with or endorsed by the Milwaukee Bucks or the NBA. Schedule data comes from ESPN and may change.</p>
+</main>
+
+<script>
+  var CAL_NAME = "Milwaukee Bucks";
+
+  function buildLinks(pageHref) {
+    var https = new URL("bucks.ics", pageHref).href;
+    var webcal = https.replace(/^https?:/, "webcal:");
+    return {
+      https: https,
+      apple: webcal,
+      google: "https://calendar.google.com/calendar/render?cid=" + encodeURIComponent(webcal),
+      outlook: "https://outlook.live.com/calendar/0/addfromweb?url=" +
+        encodeURIComponent(https) + "&name=" + encodeURIComponent(CAL_NAME)
+    };
+  }
+
+  if (typeof document !== "undefined") {
+    var links = buildLinks(location.href);
+    document.getElementById("apple").href = links.apple;
+    document.getElementById("google").href = links.google;
+    document.getElementById("outlook").href = links.outlook;
+    document.getElementById("url").textContent = links.https;
+
+    document.getElementById("copy").addEventListener("click", function () {
+      var btn = this;
+      function done(msg) {
+        btn.textContent = msg;
+        setTimeout(function () { btn.textContent = "Copy calendar link"; }, 2000);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(links.https).then(
+          function () { done("Copied!"); },
+          function () { window.prompt("Copy this link:", links.https); }
+        );
+      } else {
+        window.prompt("Copy this link:", links.https);
+      }
+    });
+  }
+</script>
+</body>
+</html>
