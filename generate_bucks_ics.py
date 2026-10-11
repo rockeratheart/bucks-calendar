@@ -10,8 +10,9 @@ season, and rolls over to the next season automatically after June.
 Event title:  "{Away Team} @ {Home Team}"
 Time zone:    America/Chicago (Central Time)
 Description:  Watch: the national TV/streaming channel(s) ESPN lists for the
-              game, or "Bucks+" when no national channel is listed; arena;
-              playoff round if any.
+              game. With no national channel: "Bucks+" for home games and
+              "League Pass / Bucks+" for away games. Also arena and playoff
+              round if any.
 
 Usage:
     python3 generate_bucks_ics.py --output public/bucks.ics
@@ -29,9 +30,10 @@ TEAM_SLUG = "mil"
 BUCKS_ESPN_ID = "15"
 SEASON_TYPES = (1, 2, 3, 5)  # preseason, regular season, postseason, play-in
 
-# ESPN only lists NATIONAL broadcasts. Any game with no national channel
-# listed shows this channel on its "Watch:" line instead.
-FALLBACK_CHANNEL = "Bucks+"
+# ESPN only lists NATIONAL broadcasts. A game with no national channel listed
+# shows one of these on its "Watch:" line instead:
+FALLBACK_CHANNEL = "Bucks+"                      # home games
+AWAY_FALLBACK_CHANNEL = "League Pass / Bucks+"   # games played away from home
 
 CENTRAL = ZoneInfo("America/Chicago")
 EASTERN = ZoneInfo("America/New_York")
@@ -172,7 +174,10 @@ def build_event(ev, broadcasts, stamp):
         return None
     title = f"{team_name(away)} @ {team_name(home)}"
 
-    watch = list(broadcasts) or [FALLBACK_CHANNEL]
+    bucks_away = (home.get("id") != BUCKS_ESPN_ID
+                  and (home.get("team") or {}).get("id") != BUCKS_ESPN_ID)
+    fallback = AWAY_FALLBACK_CHANNEL if bucks_away else FALLBACK_CHANNEL
+    watch = list(broadcasts) or [fallback]
     lines = ["Watch: " + ", ".join(watch)]
 
     for note in comp.get("notes", []) or []:
