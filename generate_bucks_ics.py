@@ -1,31 +1,40 @@
 #!/usr/bin/env python3
 """Build a subscribable .ics feed of the Milwaukee Bucks schedule.
 
-Source: NBA.com's official schedule data (the same file that powers
-nba.com/bucks/schedule). It covers preseason, regular season, NBA Cup,
-play-in and playoffs, so every phase appears automatically once the NBA
-publishes it.
+Data source: ESPN's public JSON API. (NBA.com's own schedule feed refuses
+requests from GitHub's servers, so it can't be used from GitHub Actions.)
+
+Covers preseason, regular season, play-in and playoffs for the current
+season, and rolls over to the next season automatically after June.
 
 Event title:  "{Away Team} @ {Home Team}"
 Time zone:    America/Chicago (Central Time)
-Description:  where to watch (national TV/streaming + the Bucks-side local
-              broadcast), plus game label / series status and arena.
+Description:  Watch: national TV/streaming ESPN lists for the game, plus the
+              LOCAL_TV channel you set below; arena; playoff round if any.
 
 Usage:
     python3 generate_bucks_ics.py --output public/bucks.ics
-    python3 generate_bucks_ics.py --input schedule.json --output bucks.ics   # offline test
 """
 import argparse
-import json
 import sys
 import time
+import json
 import urllib.request
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from zoneinfo import ZoneInfo
 
-SOURCE_URL = "https://cdn.nba.com/static/json/staticData/scheduleLeagueV2.json"
-BUCKS_ID = 1610612749
+API = "https://site.api.espn.com/apis/site/v2/sports/basketball/nba"
+TEAM_SLUG = "mil"
+BUCKS_ESPN_ID = "15"
+SEASON_TYPES = (1, 2, 3, 5)  # preseason, regular season, postseason, play-in
+
+# ESPN only lists NATIONAL broadcasts. Set this to the Bucks' local TV channel
+# (for example "FanDuel Sports Network Wisconsin") and it is added to every
+# game's "Watch:" line. Leave "" to show only national broadcasts.
+LOCAL_TV = ""
+
 CENTRAL = ZoneInfo("America/Chicago")
+EASTERN = ZoneInfo("America/New_York")
 GAME_LENGTH = timedelta(hours=2, minutes=30)
 CAL_NAME = "Milwaukee Bucks"
 
@@ -49,55 +58,78 @@ END:STANDARD
 END:VTIMEZONE"""
 
 
-def fetch_schedule():
+def get_json(url, tries=4):
     req = urllib.request.Request(
-        SOURCE_URL,
-        headers={
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                          "(KHTML, like Gecko) Chrome/124.0 Safari/537.36",
-            "Referer": "https://www.nba.com/",
-            "Origin": "https://www.nba.com",
-            "Accept": "application/json",
-        },
+        url, headers={"User-Agent": "Mozilla/5.0 bucks-calendar", "Accept": "application/json"}
     )
     last = None
-    for attempt in range(4):
+    for attempt in range(tries):
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
                 return json.load(r)
-        except Exception as e:  # network / HTTP errors
+        except Exception as e:
             last = e
             time.sleep(2 ** attempt)
-    raise SystemExit(f"Could not fetch schedule: {last}")
+    print(f"warning: could not fetch {url}: {last}", file=sys.stderr)
+    return None
 
 
-def team_name(team):
-    team = team or {}
-    if not team.get("teamId"):
-        return "TBD"
-    name = f"{team.get('teamCity', '')} {team.get('teamName', '')}".strip()
-    return name or team.get("teamTricode") or "TBD"
+def season_year(today):
+    """ESPN labels a season by the year it ends: 2026-27 is 2027."""
+    return today.year + 1 if today.month >= 7 else today.year
 
 
-def broadcaster_names(entries):
-    out = []
-    for b in entries or []:
-        n = b.get("broadcasterDisplay") or b.get("broadcasterAbbreviation")
-        if n and n not in out:
-            out.append(n)
-    return out
+def parse_utc(s):
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return None
 
 
-def watch_list(game, bucks_home):
-    b = game.get("broadcasters") or {}
-    side = "home" if bucks_home else "away"
-    names = []
-    for key in ("nationalTvBroadcasters", "nationalOttBroadcasters",
-                f"{side}TvBroadcasters", f"{side}OttBroadcasters"):
-        for n in broadcaster_names(b.get(key)):
-            if n not in names:
-                names.append(n)
-    return names
+def fetch_events(year):
+    events = {}
+    for st in SEASON_TYPES:
+        data = get_json(f"{API}/teams/{TEAM_SLUG}/schedule?season={year}&seasontype={st}")
+        for ev in (data or {}).get("events", []):
+            events[str(ev["id"])] = ev
+    return events
+
+
+def fetch_broadcasts(events, today):
+    """Map event id -> list of broadcast names, from ESPN's per-day scoreboard."""
+    days = set()
+    for ev in events.values():
+        start = parse_utc(ev.get("date"))
+        if start:
+            d = start.astimezone(EASTERN).date()
+            if d >= today - timedelta(days=1):
+                days.add(d)
+    found = {}
+    for d in sorted(days):
+        data = get_json(f"{API}/scoreboard?dates={d:%Y%m%d}&limit=50")
+        for ev in (data or {}).get("events", []):
+            eid = str(ev.get("id"))
+            if eid not in events:
+                continue
+            names = []
+            for comp in ev.get("competitions", []):
+                for b in comp.get("broadcasts", []) or []:
+                    market = (b.get("market") or "")
+                    if isinstance(market, dict):
+                        market = market.get("type", "")
+                    for n in b.get("names", []) or []:
+                        if n and n not in names and str(market).lower() in ("national", ""):
+                            names.append(n)
+                for g in comp.get("geoBroadcasts", []) or []:
+                    mtype = str((g.get("market") or {}).get("type", "")).lower()
+                    n = (g.get("media") or {}).get("shortName")
+                    if n and n not in names and mtype == "national":
+                        names.append(n)
+            if names:
+                found[eid] = names
+    return found
 
 
 def esc(text):
@@ -107,8 +139,7 @@ def esc(text):
 
 def fold(line):
     """RFC 5545 line folding at 75 octets."""
-    raw = line.encode("utf-8")
-    if len(raw) <= 75:
+    if len(line.encode("utf-8")) <= 75:
         return line
     parts, cur = [], b""
     for ch in line:
@@ -122,81 +153,76 @@ def fold(line):
     return "\r\n ".join(p.decode("utf-8") for p in parts)
 
 
-def parse_utc(s):
-    if not s:
-        return None
-    try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00")).astimezone(timezone.utc)
-    except ValueError:
-        return None
+def team_name(competitor):
+    team = (competitor or {}).get("team") or {}
+    name = team.get("displayName") or team.get("location") or ""
+    return name if name and name.upper() != "TBD" else "TBD"
 
 
-def build_event(game, stamp):
-    home, away = game.get("homeTeam") or {}, game.get("awayTeam") or {}
-    bucks_home = home.get("teamId") == BUCKS_ID
+def build_event(ev, broadcasts, stamp):
+    comp = (ev.get("competitions") or [{}])[0]
+    by_side = {c.get("homeAway"): c for c in comp.get("competitors", [])}
+    home, away = by_side.get("home"), by_side.get("away")
+    if not home or not away:
+        return None
     title = f"{team_name(away)} @ {team_name(home)}"
 
-    watch = watch_list(game, bucks_home)
+    watch = list(broadcasts)
+    if LOCAL_TV and LOCAL_TV not in watch:
+        watch.append(LOCAL_TV)
     lines = ["Watch: " + (", ".join(watch) if watch else "TBD (not yet announced)")]
-    label = " – ".join(x for x in (game.get("gameLabel"), game.get("gameSubLabel")) if x)
-    if label:
-        lines.append(label)
-    if game.get("seriesText"):
-        lines.append(game["seriesText"])
-    arena = ", ".join(x for x in (game.get("arenaName"), game.get("arenaCity")) if x)
+
+    for note in comp.get("notes", []) or []:
+        if note.get("headline"):
+            lines.append(note["headline"])
+    st = (ev.get("seasonType") or {}).get("name")
+    if st and st != "Regular Season":
+        lines.append(st)
+
+    venue = comp.get("venue") or {}
+    addr = venue.get("address") or {}
+    arena = ", ".join(x for x in (venue.get("fullName"), addr.get("city")) if x)
     if arena:
         lines.append(f"Arena: {arena}")
 
-    start = parse_utc(game.get("gameDateTimeUTC"))
-    status_text = (game.get("gameStatusText") or "").strip().upper()
-    tbd = start is None or status_text == "TBD"
+    start = parse_utc(ev.get("date"))
+    tbd = start is None or ev.get("timeValid") is False
 
-    ev = ["BEGIN:VEVENT",
-          f"UID:nba-{game['gameId']}@bucks-calendar",
-          f"DTSTAMP:{stamp}",
-          f"SUMMARY:{esc(title)}",
-          f"DESCRIPTION:{esc(chr(10).join(lines))}"]
+    out = ["BEGIN:VEVENT",
+           f"UID:espn-{ev['id']}@bucks-calendar",
+           f"DTSTAMP:{stamp}",
+           f"SUMMARY:{esc(title)}"]
     if arena:
-        ev.append(f"LOCATION:{esc(arena)}")
-
+        out.append(f"LOCATION:{esc(arena)}")
     if tbd:
-        day_src = game.get("gameDateEst") or game.get("gameDateUTC") or ""
-        try:
-            day = datetime.fromisoformat(day_src.replace("Z", "+00:00")).date()
-        except ValueError:
+        if start is None:
             return None
-        ev.append(f"DTSTART;VALUE=DATE:{day:%Y%m%d}")
-        ev.append(f"DTEND;VALUE=DATE:{day + timedelta(days=1):%Y%m%d}")
-        ev[4] = "DESCRIPTION:" + esc("Start time TBD\n" + "\n".join(lines))
+        day = start.astimezone(CENTRAL).date()
+        lines.insert(0, "Start time TBD")
+        out.append(f"DTSTART;VALUE=DATE:{day:%Y%m%d}")
+        out.append(f"DTEND;VALUE=DATE:{day + timedelta(days=1):%Y%m%d}")
     else:
         local = start.astimezone(CENTRAL)
         end = (start + GAME_LENGTH).astimezone(CENTRAL)
-        ev.append(f"DTSTART;TZID=America/Chicago:{local:%Y%m%dT%H%M%S}")
-        ev.append(f"DTEND;TZID=America/Chicago:{end:%Y%m%dT%H%M%S}")
-    ev.append("END:VEVENT")
-    return ev
+        out.append(f"DTSTART;TZID=America/Chicago:{local:%Y%m%dT%H%M%S}")
+        out.append(f"DTEND;TZID=America/Chicago:{end:%Y%m%dT%H%M%S}")
+    out.insert(4, f"DESCRIPTION:{esc(chr(10).join(lines))}")
+    out.append("END:VEVENT")
+    return out
 
 
-def build_calendar(data):
+def build_calendar(events, broadcasts):
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    games = []
-    for gd in data["leagueSchedule"]["gameDates"]:
-        for g in gd.get("games", []):
-            ids = {(g.get("homeTeam") or {}).get("teamId"),
-                   (g.get("awayTeam") or {}).get("teamId")}
-            if BUCKS_ID in ids:
-                games.append(g)
-
     out = ["BEGIN:VCALENDAR", "VERSION:2.0",
-           "PRODID:-//bucks-calendar//NBA schedule feed//EN",
+           "PRODID:-//bucks-calendar//ESPN schedule feed//EN",
            "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
            f"X-WR-CALNAME:{CAL_NAME}",
            "X-WR-TIMEZONE:America/Chicago",
            "REFRESH-INTERVAL;VALUE=DURATION:PT6H",
            "X-PUBLISHED-TTL:PT6H", VTIMEZONE.replace("\n", "\r\n")]
     count = 0
-    for g in games:
-        ev = build_event(g, stamp)
+    for eid in sorted(events, key=lambda i: events[i].get("date", "")):
+        ev = build_event(events[eid], broadcasts.get(eid, []), stamp)
         if ev:
             out.extend(ev)
             count += 1
@@ -207,22 +233,20 @@ def build_calendar(data):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--input", help="read schedule JSON from a local file instead of fetching")
     ap.add_argument("--output", default="bucks.ics")
     args = ap.parse_args()
 
-    if args.input:
-        with open(args.input, encoding="utf-8") as f:
-            data = json.load(f)
-    else:
-        data = fetch_schedule()
-
-    body, count = build_calendar(data)
+    today = date.today()
+    events = fetch_events(season_year(today))
+    if not events:
+        raise SystemExit("No Bucks games returned by ESPN; refusing to overwrite the feed.")
+    broadcasts = fetch_broadcasts(events, today)
+    body, count = build_calendar(events, broadcasts)
     if count == 0:
-        raise SystemExit("No Bucks games found in the schedule data; refusing to overwrite the feed.")
+        raise SystemExit("No usable games; refusing to overwrite the feed.")
     with open(args.output, "w", encoding="utf-8", newline="") as f:
         f.write(body)
-    print(f"Wrote {count} events to {args.output}")
+    print(f"Wrote {count} events ({len(broadcasts)} with broadcast info) to {args.output}")
 
 
 if __name__ == "__main__":
