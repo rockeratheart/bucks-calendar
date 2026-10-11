@@ -215,6 +215,9 @@ def build_event(ev, broadcasts, stamp):
         out.append(f"DTSTART;TZID=America/Chicago:{local:%Y%m%dT%H%M%S}")
         out.append(f"DTEND;TZID=America/Chicago:{end:%Y%m%dT%H%M%S}")
     out.insert(4, f"DESCRIPTION:{esc(chr(10).join(lines))}")
+    # Show as "free" so games don't block out time on your calendar.
+    out.append("TRANSP:TRANSPARENT")
+    out.append("X-MICROSOFT-CDO-BUSYSTATUS:FREE")
     out.append("END:VEVENT")
     return out
 
