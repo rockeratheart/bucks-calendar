@@ -9,8 +9,9 @@ season, and rolls over to the next season automatically after June.
 
 Event title:  "{Away Team} @ {Home Team}"
 Time zone:    America/Chicago (Central Time)
-Description:  Watch: national TV/streaming ESPN lists for the game, plus the
-              LOCAL_TV channel you set below; arena; playoff round if any.
+Description:  Watch: the national TV/streaming channel(s) ESPN lists for the
+              game, or "Bucks+" when no national channel is listed; arena;
+              playoff round if any.
 
 Usage:
     python3 generate_bucks_ics.py --output public/bucks.ics
@@ -28,10 +29,9 @@ TEAM_SLUG = "mil"
 BUCKS_ESPN_ID = "15"
 SEASON_TYPES = (1, 2, 3, 5)  # preseason, regular season, postseason, play-in
 
-# ESPN only lists NATIONAL broadcasts. Set this to the Bucks' local TV channel
-# (for example "FanDuel Sports Network Wisconsin") and it is added to every
-# game's "Watch:" line. Leave "" to show only national broadcasts.
-LOCAL_TV = ""
+# ESPN only lists NATIONAL broadcasts. Any game with no national channel
+# listed shows this channel on its "Watch:" line instead.
+FALLBACK_CHANNEL = "Bucks+"
 
 CENTRAL = ZoneInfo("America/Chicago")
 EASTERN = ZoneInfo("America/New_York")
@@ -167,10 +167,8 @@ def build_event(ev, broadcasts, stamp):
         return None
     title = f"{team_name(away)} @ {team_name(home)}"
 
-    watch = list(broadcasts)
-    if LOCAL_TV and LOCAL_TV not in watch:
-        watch.append(LOCAL_TV)
-    lines = ["Watch: " + (", ".join(watch) if watch else "TBD (not yet announced)")]
+    watch = list(broadcasts) or [FALLBACK_CHANNEL]
+    lines = ["Watch: " + ", ".join(watch)]
 
     for note in comp.get("notes", []) or []:
         if note.get("headline"):
