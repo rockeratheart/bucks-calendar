@@ -37,6 +37,7 @@ The easiest way is to open the subscribe page above and tap the button for your 
 - Times shown in Central Time. Your calendar converts them to your own time zone.
 - **Watch:** in each event's description lists where to watch. National TV or streaming channels are shown when they're announced. Games without a national channel show **MY24 / Bucks+** for home games and **League Pass / Bucks+** for away games.
 - Playoff round and series details in the description when they apply.
+- Events are marked as **free**, so games don't make you show as busy.
 - Games with no start time yet appear as all-day events and move to the right time once it's set. An opponent not yet decided shows as **TBD**.
 
 ## Common questions
