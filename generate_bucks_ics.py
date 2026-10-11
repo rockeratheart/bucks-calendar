@@ -10,7 +10,7 @@ season, and rolls over to the next season automatically after June.
 Event title:  "{Away Team} @ {Home Team}"
 Time zone:    America/Chicago (Central Time)
 Description:  Watch: the national TV/streaming channel(s) ESPN lists for the
-              game. With no national channel: "Bucks+" for home games and
+              game. With no national channel: "MY24 / Bucks+" for home games and
               "League Pass / Bucks+" for away games. Also arena and playoff
               round if any.
 
@@ -32,7 +32,7 @@ SEASON_TYPES = (1, 2, 3, 5)  # preseason, regular season, postseason, play-in
 
 # ESPN only lists NATIONAL broadcasts. A game with no national channel listed
 # shows one of these on its "Watch:" line instead:
-FALLBACK_CHANNEL = "Bucks+"                      # home games
+FALLBACK_CHANNEL = "MY24 / Bucks+"               # home games
 AWAY_FALLBACK_CHANNEL = "League Pass / Bucks+"   # games played away from home
 
 CENTRAL = ZoneInfo("America/Chicago")
