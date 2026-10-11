@@ -2,7 +2,7 @@
 
 A calendar you subscribe to once. Every Bucks game shows up in your calendar app and stays up to date on its own, including the play-in and playoffs if the team makes them, and future seasons.
 
-**Subscribe page: https://rockeratheart.github.io/bucks-calendar/**
+**Subscribe page: https://rockeratheart.github.io/bucks-calendar/index.html**
 
 Calendar link (for apps that ask for a URL): `https://rockeratheart.github.io/bucks-calendar/bucks.ics`
 
