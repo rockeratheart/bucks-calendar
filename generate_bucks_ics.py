@@ -154,8 +154,13 @@ def fold(line):
 
 
 def team_name(competitor):
+    """Team nickname only, e.g. "Bucks" (no city)."""
     team = (competitor or {}).get("team") or {}
-    name = team.get("displayName") or team.get("location") or ""
+    name = team.get("shortDisplayName")
+    if not name:
+        full = team.get("displayName") or ""
+        loc = team.get("location") or ""
+        name = full[len(loc):].strip() if loc and full.startswith(loc) else full
     return name if name and name.upper() != "TBD" else "TBD"
 
 
