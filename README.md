@@ -35,7 +35,7 @@ The easiest way is to open the subscribe page above and tap the button for your 
 
 - Events named like **Celtics @ Bucks**: away team first, home team second.
 - Times shown in Central Time. Your calendar converts them to your own time zone.
-- **Watch:** in each event's description lists where to watch. National TV or streaming channels are shown when they're announced. Games without a national channel show **Bucks+**.
+- **Watch:** in each event's description lists where to watch. National TV or streaming channels are shown when they're announced. Games without a national channel show **Bucks+** for home games and **League Pass / Bucks+** for away games.
 - Playoff round and series details in the description when they apply.
 - Games with no start time yet appear as all-day events and move to the right time once it's set. An opponent not yet decided shows as **TBD**.
 
@@ -72,7 +72,8 @@ The easiest way is to open the subscribe page above and tap the button for your 
 4. Run the workflow once from the **Actions** tab (**Run workflow**). After that it runs on its own.
 
 ### Settings in `generate_bucks_ics.py`
-- `FALLBACK_CHANNEL` (default `"Bucks+"`): shown on games with no national channel listed.
+- `FALLBACK_CHANNEL` (default `"Bucks+"`): shown on home games with no national channel listed.
+- `AWAY_FALLBACK_CHANNEL` (default `"League Pass / Bucks+"`): shown on away games with no national channel listed.
 - `GAME_LENGTH`: each event lasts 2.5 hours, since the data has no end time.
 - `CAL_NAME`: the calendar's display name.
 
