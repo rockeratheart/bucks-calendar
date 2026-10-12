@@ -209,7 +209,10 @@ def build_event(ev, broadcasts, stamp):
     if tbd:
         if start is None:
             return None
-        day = start.astimezone(CENTRAL).date()
+        # ESPN uses a placeholder time (about midnight Eastern) when the real
+        # start time isn't set. Its UTC date is the intended game day; converting
+        # the placeholder to Central would land on the previous day.
+        day = start.date()
         lines.insert(0, "Start time TBD")
         out.append(f"DTSTART;VALUE=DATE:{day:%Y%m%d}")
         out.append(f"DTEND;VALUE=DATE:{day + timedelta(days=1):%Y%m%d}")
