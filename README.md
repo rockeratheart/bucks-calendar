@@ -33,7 +33,7 @@ The easiest way is to open the subscribe page above and tap the button for your 
 
 ## What you'll see
 
-- Events named like **Celtics @ Bucks**: away team first, home team second.
+- Events named like **🏀 Celtics @ Bucks**: a basketball emoji, then the away team, then the home team.
 - Times shown in Central Time. Your calendar converts them to your own time zone.
 - **Watch:** in each event's description lists where to watch. National TV or streaming channels are shown when they're announced. Games without a national channel show **MY24 / Bucks+** for home games and **League Pass / Bucks+** for away games.
 - Playoff round and series details in the description when they apply.
