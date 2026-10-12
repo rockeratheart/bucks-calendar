@@ -7,12 +7,13 @@ requests from GitHub's servers, so it can't be used from GitHub Actions.)
 Covers preseason, regular season, play-in and playoffs for the current
 season, and rolls over to the next season automatically after June.
 
-Event title:  "{Away Team} @ {Home Team}"
+Event title:  "🏀 {Away Team} @ {Home Team}" (team names only, no city)
 Time zone:    America/Chicago (Central Time)
 Description:  Watch: the national TV/streaming channel(s) ESPN lists for the
               game. With no national channel: "MY24 / Bucks+" for home games and
-              "League Pass / Bucks+" for away games. Also arena and playoff
-              round if any.
+              "League Pass / Bucks+" for away games. If there is a game type
+              (Preseason, playoff round, etc.) it follows after a blank line.
+              The arena goes in the event's Location field.
 
 Usage:
     python3 generate_bucks_ics.py --output public/bucks.ics
@@ -172,7 +173,7 @@ def build_event(ev, broadcasts, stamp):
     home, away = by_side.get("home"), by_side.get("away")
     if not home or not away:
         return None
-    title = f"{team_name(away)} @ {team_name(home)}"
+    title = f"\U0001F3C0 {team_name(away)} @ {team_name(home)}"
 
     bucks_away = (home.get("id") != BUCKS_ESPN_ID
                   and (home.get("team") or {}).get("id") != BUCKS_ESPN_ID)
@@ -180,18 +181,21 @@ def build_event(ev, broadcasts, stamp):
     watch = list(broadcasts) or [fallback]
     lines = ["Watch: " + ", ".join(watch)]
 
+    details = []
     for note in comp.get("notes", []) or []:
         if note.get("headline"):
-            lines.append(note["headline"])
+            details.append(note["headline"])
     st = (ev.get("seasonType") or {}).get("name")
     if st and st != "Regular Season":
-        lines.append(st)
+        details.append(st)
+    if details:
+        lines.append("")  # blank line between the channel and the game type
+        lines.extend(details)
 
+    # The arena is used for the event's Location field, not the description.
     venue = comp.get("venue") or {}
     addr = venue.get("address") or {}
     arena = ", ".join(x for x in (venue.get("fullName"), addr.get("city")) if x)
-    if arena:
-        lines.append(f"Arena: {arena}")
 
     start = parse_utc(ev.get("date"))
     tbd = start is None or ev.get("timeValid") is False
